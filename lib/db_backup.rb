@@ -129,10 +129,9 @@ class DbBackup
 				system "mysqldump -P #{DbBackup.port} -h #{DbBackup.host} -u #{DbBackup.username} -p#{DbBackup.password} --databases #{DbBackup.db_name} | gzip > #{backup_filename_path}"
 				
 			    # save to aws-s3
-
 			    AWS::S3::DEFAULT_HOST.replace "s3-#{@@s3_region}.amazonaws.com"
-			    AWS::S3::Base.establish_connection!(:access_key_id     => "#{@@aws_access_key}", :secret_access_key => "@@aws_secret_key")
-			    AWS::S3::S3Object.store(backup_filename, backup_filename_path, s3_bucket)
+			    AWS::S3::Base.establish_connection!(:access_key_id => DbBackup.aws_access_key, :secret_access_key => DbBackup.aws_secret_key)
+			    AWS::S3::S3Object.store(backup_filename, backup_filename_path, DbBackup.s3_bucket)
 
 			    # remove local backup file
 			    system "rm -f #{backup_filename_path}"
