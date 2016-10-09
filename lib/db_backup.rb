@@ -1,116 +1,37 @@
 require 'aws/s3'
 
 class DbBackup
-	@@host = 'localhost'
-	@@port = 3306
-	@@backup_path = ''
-	@@db_username = ''
-	@@db_password = ''
-	@@db_name = ''
-	@@s3_bucket  = ''
-	@@aws_access_key = ''
-	@@aws_secret_key  = '' 
-	@@s3_region = ''
+	attr_accessor :username, :password, :backup_path, :db_name, :aws_access_key, :aws_secret_key, :s3_bucket, :s3_region
+	attr_writer :host, :port
 
-	def self.host=(hostname)
-		@@host = hostname
+	def host
+		@host || 'localhost'
 	end
 
-	def self.host
-		@@host
+	def port
+		@port || 3306
 	end
 
-	def self.port=(port)
-		port = port
-	end
-
-	def self.port
-		@@port
-	end
-
-	def self.username=(db_username)
-		@@db_username = db_username
-	end
-
-	def self.username
-		@@db_username
-	end
-
-	def self.password=(db_password)
-		@@db_password = db_password
-	end
-
-	def self.password
-		@@db_password
-	end
-
-	def self.backup_path=(backup_path)
-		@@backup_path = backup_path
-	end
-
-	def self.backup_path
-		@@backup_path
-	end
-
-	def self.db_name=(db_name)
-		@@db_name = db_name
-	end
-
-	def self.db_name
-		@@db_name
-	end
-
-	def self.aws_access_key=(aws_access_key)
-		@@aws_access_key = aws_access_key
-	end
-
-	def self.aws_access_key
-		@@aws_access_key
-	end
-
-	def self.aws_secret_key=(aws_secret_key)
-		@@aws_secret_key = aws_secret_key
-	end
-
-	def self.aws_secret_key
-		@@aws_secret_key
-	end
-
-	def self.s3_bucket=(s3_bucket)
-		@@s3_bucket = s3_bucket
-	end
-
-	def self.s3_bucket
-		@@s3_bucket
-	end
-
-	def self.s3_region=(s3_region)
-		@@s3_region = s3_region
-	end
-
-	def self.s3_region
-		@@s3_region
-	end
-
-	def self.take_local_backup()
+	def take_local_backup()
 		begin
-			if DbBackup.password && DbBackup.db_name	
-				if DbBackup.backup_path.strip.empty?
-					system "mkdir -p ~/backup/mysql_backup/#{Time.now.strftime("%d_%m_%Y")}"
-					DbBackup.backup_path = "~/backup/mysql_backup/#{Time.now.strftime("%d_%m_%Y")}/"
+			if @password && @db_name	
+				if @backup_path.strip.empty?
+					system "mkdir -p ~/backup/mysql_backup/#{Time.now.strftime("%d_%m_%Y_%H_%M")}"
+					@backup_path = "~/backup/mysql_backup/#{Time.now.strftime("%d_%m_%Y_%H_%M")}/"
 				else
-					path = DbBackup.backup_path
-					unless File.directory?(path)
+					unless File.directory?(@backup_path.strip)
 						puts "This path doesn't exist."
 						puts "Try to use absolute path."
 						return nil
 					else
-						unless path.strip[-1] == "/"
-							path.strip << "/"
+						path = @backup_path.strip
+						unless path[-1] == "/"
+							path += "/"
+							@backup_path = path
 						end
 					end
 				end
-				system "mysqldump -P #{DbBackup.port} -h #{DbBackup.host} -u #{DbBackup.username} -p#{DbBackup.password} --databases #{DbBackup.db_name} | gzip > #{DbBackup.backup_path}#{Time.now.strftime("%d_%m_%Y_%H_%M")}_mysql_db.sql.gz"
+				system "mysqldump -P #{@port} -h #{@host} -u #{@username} -p#{@password} --databases #{@db_name} | gzip > #{@backup_path}#{Time.now.strftime("%d_%m_%Y_%H_%M")}_mysql_db.sql.gz"
 				puts "Database backed up successfully."
 			else
 				puts "Some fields are missing. Check all the attributes."
@@ -120,19 +41,19 @@ class DbBackup
 		end
 	end
 
-	def self.backup_on_s3()
+	def backup_on_s3()
 		begin
-			if DbBackup.s3_region && DbBackup.s3_bucket && DbBackup.aws_secret_key && DbBackup.aws_access_key && DbBackup.db_name
+			if @s3_region && @s3_bucket && @aws_secret_key && @aws_access_key && @db_name
 				backup_filename = "#{Time.now.strftime("%d_%m_%Y_%H_%M")}_mysql_db.sql.gz"
 				backup_filename_path = "/tmp/#{backup_filename}"
 
-				system "mysqldump -P #{DbBackup.port} -h #{DbBackup.host} -u #{DbBackup.username} -p#{DbBackup.password} --databases #{DbBackup.db_name} | gzip > #{backup_filename_path}"
+				system "mysqldump -P #{@port} -h #{@host} -u #{@username} -p#{@password} --databases #{@db_name} | gzip > #{backup_filename_path}"
 				
 			    # save to aws-s3
-			    AWS::S3::DEFAULT_HOST.replace "s3-#{@@s3_region}.amazonaws.com"
-			    AWS::S3::Base.establish_connection!(:access_key_id => DbBackup.aws_access_key, :secret_access_key => DbBackup.aws_secret_key)
-			    AWS::S3::S3Object.store(backup_filename, backup_filename_path, DbBackup.s3_bucket)
-
+			    AWS::S3::DEFAULT_HOST.replace "s3-#{@s3_region}.amazonaws.com"
+			    AWS::S3::Base.establish_connection!(:access_key_id => @aws_access_key, :secret_access_key => @aws_secret_key)
+			    AWS::S3::S3Object.store(backup_filename, backup_filename_path, @s3_bucket)
+			    puts "Database backed up successfully."
 			    # remove local backup file
 			    system "rm -f #{backup_filename_path}"
 			else
